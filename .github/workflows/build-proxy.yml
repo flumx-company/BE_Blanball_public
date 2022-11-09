@@ -1,0 +1,34 @@
+on: [push,workflow_dispatch]
+
+env:
+  PROXY_DOCKERFILE_PATH: nginx/Dockerfile
+  PROXY_LATEST_IMAGE: ${{ secrets.DOCKER_PROXY_REGISTRY }}:latest
+  PROXY_COMMIT_IMAGE: ${{ secrets.DOCKER_PROXY_REGISTRY }}:${{ github.sha }}
+
+jobs:
+  build_proxy:
+    if: contains(fromJson('["push"]'), github.event_name) && github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || contains(fromJson('["workflow_dispatch"]'), github.event_name)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ secrets.DOCKER_PROXY_REGISTRY }}
+        username: ${{ secrets.REGISTRY_USERNAME }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+
+    - name: Pull latest image (PROXY)
+      run: |
+        docker pull ${{ env.PROXY_LATEST_IMAGE }} --ignore-pull-failures || true
+    - name: Build image (PROXY)
+      working-directory: .
+      run: |
+        docker build -f ${{ env.PROXY_DOCKERFILE_PATH}} -t proxy --cache-from ${{ env.PROXY_LATEST_IMAGE }} -t ${{ env.PROXY_COMMIT_IMAGE }} .
+    - name: Tag latest image (PROXY)
+      run: |
+        docker tag ${{ env.PROXY_COMMIT_IMAGE }} ${{ env.PROXY_LATEST_IMAGE }}
+    - name: Push images (PROXY)
+      run: |
+        docker push ${{ env.PROXY_COMMIT_IMAGE }}
+        docker push ${{ env.PROXY_LATEST_IMAGE }}        

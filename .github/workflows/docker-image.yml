@@ -1,0 +1,95 @@
+on: [push, workflow_dispatch]
+
+jobs:
+  run_tests:
+    if: contains(fromJson('["push"]'), github.event_name) && github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || contains(fromJson('["workflow_dispatch"]'), github.event_name)
+    runs-on: ubuntu-latest
+    env:
+      ENV_FILE: ${{ secrets.ENV_FILE }}
+      PYTHON_VERSION: 3.10.7
+      POETRY_VERSION: 1.2.0
+    services:
+      db:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: postgres_test
+          POSTGRES_PASSWORD: postgres_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7.0.4-alpine
+        ports:
+          - 6379:6379
+    steps:
+    - uses: actions/checkout@master
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    - name: Install poetry
+      run: |
+        pip install --upgrade pip
+        pip install poetry==${{ env.POETRY_VERSION }}
+      env:
+        PATH: /root/.poetry/bin:/opt/venv/bin:${PATH}
+    - name: Install deps
+      run: |
+        cd project
+        poetry run pip install -U pip 
+        poetry install
+    - name: Run tests
+      run: |
+        echo $ENV_FILE | base64 --decode > .env
+        cd project
+        poetry run python3 manage.py migrate
+        poetry run python3 manage.py test --no-input
+  auto_deploy:
+    runs-on: ubuntu-latest
+    needs: run_tests
+    steps:
+    - uses: actions/checkout@master
+    - name: Set env vars (TEST)
+      if: contains(fromJson('["push"]'), github.event_name) && github.ref == 'refs/heads/develop' || contains(fromJson('["workflow_dispatch"]'), github.event_name)
+      run: |
+        echo "API_DOCKERFILE_PATH=Dockerfile" >> $GITHUB_ENV
+        echo "WEBHOOK=${{ secrets.PORTAINER_WEBHOOK_URL_TEST }}" >> $GITHUB_ENV
+        echo "REGISTRY=${{ secrets.DOCKER_REGISTRY_TEST }}" >> $GITHUB_ENV
+        echo "LATEST_IMAGE=${{ secrets.DOCKER_REGISTRY_TEST }}":latest >> $GITHUB_ENV
+        echo "COMMIT_IMAGE=${{ secrets.DOCKER_REGISTRY_TEST }}":${{ github.sha }} >> $GITHUB_ENV
+    - name: Set env vars (PROD)
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "API_DOCKERFILE_PATH=Dockerfile" >> $GITHUB_ENV
+        echo "REGISTRY=${{ secrets.DOCKER_REGISTRY_PROD }}" >> $GITHUB_ENV
+        echo "WEBHOOK=${{ secrets.PORTAINER_WEBHOOK_URL_PROD }}" >> $GITHUB_ENV
+        echo "LATEST_IMAGE=${{ secrets.DOCKER_REGISTRY_PROD }}":latest >> $GITHUB_ENV
+        echo "COMMIT_IMAGE=${{ secrets.DOCKER_REGISTRY_PROD }}":${{ github.sha }} >> $GITHUB_ENV
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.REGISTRY_USERNAME }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+
+    - name: Pull latest image (API)
+      run: |
+        docker pull ${LATEST_IMAGE} --ignore-pull-failures || true
+    - name: Build image (API)
+      working-directory: .
+      run: |
+        docker build -f ${{ env.API_DOCKERFILE_PATH }} -t api --cache-from ${{ env.LATEST_IMAGE }} -t ${{ env.COMMIT_IMAGE }} .
+    - name: Tag latest image (API)
+      run: |
+        docker tag ${{ env.COMMIT_IMAGE }} ${{ env.LATEST_IMAGE }} 
+    - name: Push images (API)
+      run: |
+        docker push ${{ env.COMMIT_IMAGE }}
+        docker push ${{ env.LATEST_IMAGE }}        
+    - name: Trigger deploy in portainer
+      run: |
+        curl -X POST ${{ env.WEBHOOK }}

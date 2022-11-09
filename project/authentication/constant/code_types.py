@@ -1,0 +1,6 @@
+PASSWORD_RESET_CODE_TYPE: str = "password_reset"
+EMAIL_VERIFY_CODE_TYPE: str = "email_verify"
+PASSWORD_CHANGE_CODE_TYPE: str = "password_change"
+EMAIL_CHANGE_CODE_TYPE: str = "email_change"
+PHONE_CHANGE_CODE_TYPE: str = "phone_change"
+ACCOUNT_DELETE_CODE_TYPE: str = "account_delete"

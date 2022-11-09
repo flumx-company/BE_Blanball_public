@@ -1,0 +1,98 @@
+version: "3.8"
+
+x-api-common: &api-common
+  env_file: 
+    - .env
+  entrypoint: scripts/entrypoint.sh
+  build: 
+    context: .
+    dockerfile: Dockerfile
+  volumes: 
+    - .:/usr/src/blanball
+  networks:
+    - app-network
+  depends_on:
+    db: 
+      condition: service_healthy
+    redis: 
+      condition: service_healthy
+  links: 
+    - redis
+
+services:
+  db:
+    container_name: db
+    env_file: 
+      - .env
+    image: postgres:latest
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    ports: 
+      - 5432:5432
+    healthcheck:
+      test: pg_isready -U postgres -d postgres
+      timeout: 5s
+      retries: 20
+
+  redis:
+    container_name: redis
+    env_file: 
+      - .env
+    image: redis:7.0.4-alpine
+    volumes: 
+      - redis-data:/usr/src/blanball/storage/redis/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      timeout: 5s
+      retries: 20
+
+  api:
+    <<: *api-common
+    container_name: api
+    command: api
+    ports: 
+      - 8000:8000
+
+  celery-worker: 
+    <<: *api-common
+    container_name: celery-worker
+    command: celery-worker
+    user: deploy
+
+  celery-beat:
+    <<: *api-common
+    container_name: celery-beat
+    command: celery-beat
+    user: deploy
+    
+  minio:
+    container_name: minio
+    env_file: 
+      - .env
+    image: minio/minio
+    volumes:
+      - minio-data:/minio-data
+    command: 'minio server /minio-data --console-address ":9001"'
+    ports:
+      - 9000:9000
+      - 9001:9001
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  ftp-server-data:
+  minio-data:

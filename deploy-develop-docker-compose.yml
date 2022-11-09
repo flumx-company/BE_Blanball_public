@@ -1,0 +1,147 @@
+version: "3.8"
+
+x-api-common: &api-common
+  image: registry.it-flumx.com/flumx_te_blanball_be_test:latest
+
+  env_file: 
+    - stack.env
+  entrypoint: scripts/entrypoint.sh
+
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  networks:
+    - app-network    
+  links:
+    - redis
+
+services: 
+
+  proxy:
+    container_name: proxy
+    env_file: 
+      - stack.env
+    image: registry.it-flumx.com/blanball-proxy:latest
+    ports:
+      - 49299:80
+    networks:
+      - app-network
+    depends_on:
+      api:
+        condition: service_started
+      
+  api:
+    <<: *api-common
+    container_name: api
+    command: api-deploy
+    user: deploy
+    ports:
+      - 49200:8000
+
+  daphne:
+    <<: *api-common
+    container_name: daphne
+    command: daphne
+    user: deploy
+    ports:
+      - 49290:10000
+
+  celery-worker:
+    <<: *api-common
+    container_name: celery-worker
+    user: deploy
+    command: celery-worker
+
+  celery-beat:
+    <<: *api-common
+    container_name: celery-beat
+    command: celery-beat
+
+  db:
+    container_name: db
+    env_file: 
+      - stack.env
+    image: postgres:latest
+    restart: always
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: pg_isready -U postgres -d postgres
+      timeout: 5s
+      retries: 20
+
+  redis:
+    container_name: redis
+    env_file: 
+      - stack.env
+    image: redis:latest
+    restart: always
+    volumes:
+      - redis-data:/usr/src/blanball/storage/redis/data
+    networks:
+      - app-network  
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      timeout: 3s
+      retries: 5
+
+  pgadmin:
+    container_name: pgadmin
+    env_file: 
+      - stack.env
+    image: dpage/pgadmin4
+    restart: always
+    volumes:
+      - pgadmin-data:/usr/src/blanball/storage/pgadmin/data
+    networks:
+      - app-network
+    ports:
+      - 49280:${PGADMIN_LISTEN_PORT}
+
+  db_backup:
+    container_name: db_backup
+    env_file: 
+      - stack.env
+    image: prodrigestivill/postgres-backup-local
+    restart: always
+    volumes:
+      - db-backup-data:/usr/src/blanball/storage/db-backup/data
+    networks:
+      - app-network
+    depends_on:
+      db:
+        condition: service_started
+
+  minio:
+    container_name: minio
+    env_file: 
+      - stack.env
+    image: minio/minio
+    volumes:
+      - minio-data:/minio-data
+    command: 'minio server /minio-data --console-address ":9001"'
+    ports:
+      - 49291:9000
+      - 49292:9001
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge    
+     
+volumes:
+  redis-data:
+  pgadmin-data:
+  db-backup-data:
+  minio-data:
+  db-data:

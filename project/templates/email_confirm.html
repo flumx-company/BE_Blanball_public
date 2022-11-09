@@ -1,0 +1,112 @@
+{% load static %}
+{% load inlinecss %}
+{% inlinecss "css/email_confirm.css" %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <table class="main">
+    <tr class="header">
+      <td class="logo-block">
+        <div class="main-logo">
+          <div class="logo">
+            <img src="https://i.ibb.co/YQpvxdK/logo.jpg" alt="logo" border="0">
+          </div>
+          <div class="name-wrapper">
+            <div class="name">
+              <span>BlanBall</span>
+            </div>
+          </div>
+        </div>
+        <div class="socials">
+          <a href="#">
+            <img src="https://i.ibb.co/d5kmN1X/facebook-icon.png" alt="facebook-icon" border="0">
+          </a>
+          <a href="#">
+            <img src="https://i.ibb.co/m4hG58H/instagram-icon.png" alt="instagram-icon" border="0">
+          </a>
+          <a href="#">
+            <img src="https://i.ibb.co/ZVqSDST/linkedin-icon.png" alt="linkedin-icon" border="0">
+          </a>
+        </div>
+      </td>
+    </tr>
+    <tr class="empty_line_52"></tr>
+    <tr class="body">
+      <td>
+        <div class="body_wrapper">
+          <div class="body_title">
+            {{body_title}}
+          </div>
+          <div class="body-user-section">
+            <div class="user-picture">
+              <img src="../src/assets/img/user.png" alt="">
+            </div>
+            <div class="user-text">
+              <div class="name">{{user_name}} {{user_last_name}}</div>
+              <div class="date">{{date_time}}</div>
+            </div>
+          </div>
+          <div class="main-letter-text">
+            <div class="title">
+              {{title}}
+            </div>
+            {{text}}
+          </div>
+        </div>
+      </td>
+    </tr>
+    <tr class="social-line-wrapper">
+      <td>
+        <div class="social-line">
+          <a href="">
+            <img src="https://i.ibb.co/DzMCRP2/twitter.jpg" alt="twitter" border="0">
+          </a>
+          <a href="">
+            <img src="https://i.ibb.co/hs3MFKZ/fb.jpg" alt="fb" border="0">
+          </a>
+          <a href="">
+            <img src="https://i.ibb.co/1ZJ5YVb/l-in.jpg" alt="l-in" border="0">
+          </a>
+        </div>
+      </td>
+    </tr>
+    <tr class="logo-line-wrapper">
+      <td>
+        <div class="logo-line">
+          <div class="logo-icon">
+            <img src="https://i.ibb.co/YQpvxdK/logo.jpg" alt="logo" border="0">
+          </div>
+          <div class="text">
+            BlanBall
+          </div>
+        </div>
+      </td>
+    </tr>
+    <tr class="footer-wrapper">
+      <td>
+        <div class="footer">
+          <div class="info1">
+            Blanball © 2022
+          </div>
+          <div class="info1">
+            Govinda’s Rewards & Recognition.
+          </div>
+          <div class="info1">
+            A better company begins with a personalized employee experience.
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+
+</html>
+{% endinlinecss %}
